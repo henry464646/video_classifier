@@ -1,4 +1,4 @@
-# 🎬 我的專屬私人番號庫 (AV Manager)
+# 🎬 我的專屬私人番號庫 (Adult Video Manager)
 
 這是一套基於 **Vue 3 + Tailwind CSS + Dexie.js (IndexedDB)** 開發的純前端私人影音管理系統。專為喜愛各類影音內容的使用者設計，支援一鍵智慧抓取、本地端高效存儲與多裝置同步備份。
 
