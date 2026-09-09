@@ -30,7 +30,7 @@
 ## 🚀 快速開始 (本地端執行)
 
 1. 將本專案複製或下載到你的電腦中，確保資料夾內包含 `index.html`。
-2. 使用 VS Code 打開專案，並透過 **Live Server** 擴充功能啟動本地伺服器（通常預設為 `http://127.0.0.1:5500/index.html`）。
+2. 使用 VS Code 打開專案，並透過 **Live Server** 擴充功能啟動本地伺服器（通常預設為 `https://henry464646.github.io/video_classifier/`）。
 3. 或直接在瀏覽器中雙擊開啟 `index.html` 即可使用。
 
 ---
@@ -47,7 +47,7 @@ javascript:(function(){
   let cover = img ? img.content : '';
   let code = t.split(/[-|_]?\s*Jable\.TV/i)[0].trim();
   let act = window.getSelection().toString().trim();
-  let myUrl = '[http://127.0.0.1:5500/index.html](http://127.0.0.1:5500/index.html)'; /* 替換為你的網址 */
+  let myUrl = '[https://henry464646.github.io/video_classifier/](https://henry464646.github.io/video_classifier/)'; /* 替換為你的網址 */
   let finalUrl = myUrl + '?code=' + encodeURIComponent(code) + '&cover=' + encodeURIComponent(cover) + '&actress=' + encodeURIComponent(act) + '&url=' + encodeURIComponent(window.location.href);
   let a = document.createElement('a'); a.href = finalUrl; a.target = '_blank';
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
@@ -62,7 +62,7 @@ javascript:(function(){
     let cover = img ? img.content : '';
     let code = t.split(/[-|_]?\s*MissAV/i)[0].trim();
     let act = window.getSelection().toString().trim();
-    let myUrl = '[http://127.0.0.1:5500/index.html](http://127.0.0.1:5500/index.html)'; /* 替換為你的網址 */
+    let myUrl = '[https://henry464646.github.io/video_classifier/](https://henry464646.github.io/video_classifier/)'; /* 替換為你的網址 */
     let finalUrl = myUrl + '?code=' + encodeURIComponent(code) + '&cover=' + encodeURIComponent(cover) + '&actress=' + encodeURIComponent(act) + '&url=' + encodeURIComponent(window.location.href);
     let a = document.createElement('a'); a.href = finalUrl; a.target = '_blank';
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
@@ -87,7 +87,7 @@ javascript:(function(){
     }
     let code = t.split(/[-|_]?\s*123AV/i)[0].trim();
     let act = window.getSelection().toString().trim();
-    let myUrl = '[http://127.0.0.1:5500/index.html](http://127.0.0.1:5500/index.html)'; /* 替換為你的網址 */
+    let myUrl = '[https://henry464646.github.io/video_classifier/](https://henry464646.github.io/video_classifier/)'; /* 替換為你的網址 */
     let finalUrl = myUrl + '?code=' + encodeURIComponent(code) + '&cover=' + encodeURIComponent(imgUrl) + '&actress=' + encodeURIComponent(act) + '&url=' + encodeURIComponent(window.location.href);
     let a = document.createElement('a'); a.href = finalUrl; a.target = '_blank';
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
