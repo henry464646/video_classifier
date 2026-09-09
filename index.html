@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="referrer" content="no-referrer">
+  <title>私密番號庫</title>
+  
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen p-6 font-sans">
+  <div id="app" class="max-w-6xl mx-auto">
+    
+    <!-- 頂部標題與工具列 -->
+    <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
+      <h1 class="text-3xl font-bold text-pink-500 shrink-0">🎬 我的專屬影片庫</h1>
+      
+      <div class="flex flex-wrap gap-2 items-center justify-end w-full md:w-auto">
+        <!-- 搜尋列 -->
+        <div class="relative flex-1 md:w-64">
+          <input v-model="searchQuery" type="text" placeholder="🔍 搜尋番號或演員..." 
+                 class="w-full bg-gray-800 text-white p-2 pl-3 rounded border border-gray-700 focus:ring-2 focus:ring-pink-500 outline-none">
+        </div>
+        
+        <!-- 排序選單 -->
+        <select v-model="sortBy" class="bg-gray-800 text-white p-2 rounded border border-gray-700 outline-none cursor-pointer">
+          <option value="latest">⏱️ 最新加入</option>
+          <option value="rating">⭐ 評價高低</option>
+          <option value="code">🔤 番號字母</option>
+        </select>
+
+        <!-- 檢視模式切換 (卡片 / 表格) -->
+        <button @click="viewMode = (viewMode === 'card' ? 'table' : 'card')" class="bg-gray-800 hover:bg-gray-700 text-gray-200 px-3 py-2 rounded border border-gray-700 transition">
+          {{ viewMode === 'card' ? '📋 切換表格' : '🖼️ 切換卡片' }}
+        </button>
+
+        <!-- 🎲 隨機選片機 -->
+        <button @click="pickRandomVideo" class="bg-amber-600 hover:bg-amber-500 text-white font-bold px-3 py-2 rounded transition shadow">
+          🎲 幫我決定
+        </button>
+        
+        <!-- NSFW 開關按鈕 -->
+        <button @click="toggleNsfw" :class="isNsfwHidden ? 'bg-red-600 hover:bg-red-500' : 'bg-gray-800 hover:bg-gray-700 text-gray-300'" class="px-3 py-2 rounded font-bold transition border border-gray-700">
+          {{ isNsfwHidden ? '🙈 NSFW 隱' : '🐵 NSFW 顯' }}
+        </button>
+
+        <!-- 備份按鈕群 -->
+        <div class="flex gap-2">
+          <button @click="exportData" class="bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 py-2 rounded transition" title="匯出備份">
+            📤 備份
+          </button>
+          <button @click="triggerImport" class="bg-purple-600 hover:bg-purple-500 text-white font-bold px-3 py-2 rounded transition" title="匯入資料">
+            📥 還原
+          </button>
+          <input type="file" ref="fileInput" @change="importData" accept=".json" class="hidden">
+        </div>
+      </div>
+    </div>
+
+    <!-- 狀態篩選按鈕列 -->
+    <div class="flex gap-2 mb-6 overflow-x-auto pb-2">
+      <button @click="statusFilter = '全部'" :class="statusFilter === '全部' ? 'bg-pink-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'" class="px-4 py-1.5 rounded-full text-sm font-bold transition whitespace-nowrap border border-gray-700">
+        全部 ({{ videos.length }})
+      </button>
+      <button @click="statusFilter = '待看'" :class="statusFilter === '待看' ? 'bg-pink-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'" class="px-4 py-1.5 rounded-full text-sm font-bold transition whitespace-nowrap border border-gray-700">
+        📥 待看 ({{ videos.filter(v => v.status === '待看').length }})
+      </button>
+      <button @click="statusFilter = '已看'" :class="statusFilter === '已看' ? 'bg-pink-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'" class="px-4 py-1.5 rounded-full text-sm font-bold transition whitespace-nowrap border border-gray-700">
+        👀 已看 ({{ videos.filter(v => v.status === '已看').length }})
+      </button>
+      <button @click="statusFilter = '喜愛'" :class="statusFilter === '喜愛' ? 'bg-pink-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'" class="px-4 py-1.5 rounded-full text-sm font-bold transition whitespace-nowrap border border-gray-700">
+        ❤️ 喜愛 ({{ videos.filter(v => v.status === '喜愛').length }})
+      </button>
+    </div>
+
+    <!-- 輸入/修改區塊 -->
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-8 border transition-colors" :class="editingId ? 'border-green-500' : 'border-gray-700'">
+      <div class="mb-3 text-green-400 font-bold flex justify-between items-center" v-if="editingId">
+        <span>✏️ 正在修改資料...</span>
+      </div>
+      
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+        <input v-model="form.code" type="text" placeholder="輸入番號/標題" class="bg-gray-700 text-white p-2 rounded focus:ring-2 focus:ring-pink-500 outline-none">
+        <input v-model="form.actress" type="text" placeholder="演員名稱" class="bg-gray-700 text-white p-2 rounded focus:ring-2 focus:ring-pink-500 outline-none">
+        <select v-model="form.status" class="bg-gray-700 text-white p-2 rounded outline-none cursor-pointer">
+          <option value="待看">📥 待看清單</option>
+          <option value="已看">👀 已經看完</option>
+          <option value="喜愛">❤️ 加入喜愛</option>
+        </select>
+        <select v-model="form.rating" class="bg-gray-700 text-white p-2 rounded outline-none cursor-pointer">
+          <option value="無">選擇評價</option>
+          <option value="⭐⭐⭐⭐⭐">⭐⭐⭐⭐⭐ 神作</option>
+          <option value="⭐⭐⭐⭐">⭐⭐⭐⭐ 推薦</option>
+          <option value="⭐⭐⭐">⭐⭐⭐ 普通</option>
+          <option value="⭐⭐">⭐⭐ 略差</option>
+          <option value="⭐">⭐ 踩雷</option>
+        </select>
+      </div>
+      
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <input v-model="form.coverUrl" type="text" placeholder="封面圖網址 (選填)" class="bg-gray-700 text-white p-2 rounded md:col-span-2 outline-none">
+        <input v-model="form.videoUrl" type="text" placeholder="觀看/下載網址 (選填)" class="bg-gray-700 text-white p-2 rounded outline-none">
+        
+        <div class="flex gap-2">
+          <button v-if="!editingId" @click="addVideo" class="bg-pink-600 hover:bg-pink-500 text-white font-bold p-2 rounded transition flex-1 w-full">
+            + 新增收藏
+          </button>
+          <template v-else>
+            <button @click="saveEdit" class="bg-green-600 hover:bg-green-500 text-white font-bold p-2 rounded transition flex-1">
+              💾 儲存修改
+            </button>
+            <button @click="cancelEdit" class="bg-gray-600 hover:bg-gray-500 text-white font-bold p-2 rounded transition w-1/3">
+              取消
+            </button>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- 列表展示區塊 -->
+    <div v-if="filteredVideos.length === 0" class="text-center text-gray-500 py-10">
+      找不到符合條件的資料 😢
+    </div>
+
+    <!-- 模式 A：卡片瀑布流 (Card View) -->
+    <div v-if="viewMode === 'card'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div v-for="video in filteredVideos" :key="video.id" class="bg-gray-800 rounded-lg overflow-hidden shadow-lg border border-gray-700 flex flex-col hover:border-pink-500/50 transition relative group">
+        
+        <div class="h-52 bg-gray-700 flex items-center justify-center overflow-hidden relative">
+          <img v-if="video.coverUrl" :src="video.coverUrl" 
+               class="w-full h-full object-cover transition duration-300"
+               :class="isNsfwHidden ? 'filter blur-md hover:blur-none cursor-pointer' : ''"
+               :title="isNsfwHidden ? 'NSFW 模糊中，點擊或懸停可暫時看清' : ''">
+          <span v-else class="text-gray-500">無封面圖</span>
+          
+          <span class="absolute top-2 right-2 text-xs px-2 py-1 bg-black/70 text-white rounded-full border border-gray-600 backdrop-blur-sm shadow pointer-events-none">
+            {{ video.status }}
+          </span>
+        </div>
+        
+        <div class="p-4 flex-1 flex flex-col">
+          <h2 class="text-xl font-bold text-white tracking-wide mb-1 truncate" :title="video.code">{{ video.code }}</h2>
+          <p @click="searchByActress(video.actress)" 
+             class="text-pink-400 font-semibold mb-2 cursor-pointer hover:text-pink-300 hover:underline inline-block w-fit" 
+             title="點擊以搜尋此演員">
+            {{ video.actress || '未知演員' }}
+          </p>
+          <p class="text-sm mb-4">{{ video.rating !== '無' ? video.rating : '尚未評分' }}</p>
+          
+          <div class="mt-auto flex justify-between items-center border-t border-gray-700 pt-3">
+            <a v-if="video.videoUrl" :href="video.videoUrl" target="_blank" class="text-blue-400 hover:text-blue-300 text-sm font-bold truncate pr-2">
+              🔗 前往觀看
+            </a>
+            <span v-else class="text-gray-500 text-sm">無連結</span>
+            
+            <div class="flex gap-3 shrink-0">
+              <button @click="editVideo(video)" class="text-green-400 hover:text-green-300 text-sm font-bold">修改</button>
+              <button @click="deleteVideo(video.id)" class="text-red-400 hover:text-red-300 text-sm font-bold">刪除</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 模式 B：精簡表格模式 (Table View) -->
+    <div v-else class="bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-x-auto">
+      <table class="w-full text-left border-collapse">
+        <thead>
+          <tr class="bg-gray-750 border-b border-gray-700 text-gray-400 text-sm">
+            <th class="p-3">封面</th>
+            <th class="p-3">番號 / 標題</th>
+            <th class="p-3">演員</th>
+            <th class="p-3">狀態</th>
+            <th class="p-3">評價</th>
+            <th class="p-3 text-center">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="video in filteredVideos" :key="video.id" class="border-b border-gray-700/50 hover:bg-gray-750 transition">
+            <td class="p-3 w-16">
+              <div class="w-12 h-16 bg-gray-700 rounded overflow-hidden flex items-center justify-center">
+                <img v-if="video.coverUrl" :src="video.coverUrl" 
+                     class="w-full h-full object-cover transition"
+                     :class="isNsfwHidden ? 'filter blur-sm hover:blur-none cursor-pointer' : ''">
+                <span v-else class="text-xs text-gray-500">無</span>
+              </div>
+            </td>
+            <td class="p-3 font-bold text-white max-w-xs truncate" :title="video.code">
+              {{ video.code }}
+            </td>
+            <td class="p-3 text-pink-400 cursor-pointer hover:underline" @click="searchByActress(video.actress)">
+              {{ video.actress || '-' }}
+            </td>
+            <td class="p-3 text-sm">
+              <span class="px-2 py-1 bg-gray-700 rounded-full text-xs border border-gray-600">{{ video.status }}</span>
+            </td>
+            <td class="p-3 text-sm whitespace-nowrap">{{ video.rating !== '無' ? video.rating : '-' }}</td>
+            <td class="p-3 text-center whitespace-nowrap">
+              <div class="flex items-center justify-center gap-3">
+                <a v-if="video.videoUrl" :href="video.videoUrl" target="_blank" class="text-blue-400 hover:text-blue-300 text-sm font-bold">觀看</a>
+                <button @click="editVideo(video)" class="text-green-400 hover:text-green-300 text-sm font-bold">修改</button>
+                <button @click="deleteVideo(video.id)" class="text-red-400 hover:text-red-300 text-sm font-bold">刪除</button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 🎲 隨機選片彈出視窗 (Modal) -->
+    <div v-if="randomModalVisible" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+      <div class="bg-gray-800 border border-pink-500 rounded-lg max-w-md w-full p-6 relative shadow-2xl animate-scale">
+        <h3 class="text-2xl font-bold text-pink-500 mb-4 text-center">🎲 今天決定看這部！</h3>
+        
+        <div v-if="selectedRandomVideo" class="flex flex-col items-center">
+          <div class="w-48 h-64 bg-gray-700 rounded overflow-hidden mb-4 shadow border border-gray-600">
+            <img :src="selectedRandomVideo.coverUrl || ''" class="w-full h-full object-cover">
+          </div>
+          <h4 class="text-lg font-bold text-white text-center mb-1">{{ selectedRandomVideo.code }}</h4>
+          <p class="text-pink-400 font-semibold mb-2">{{ selectedRandomVideo.actress || '未知演員' }}</p>
+          <p class="text-sm mb-4 text-gray-300">{{ selectedRandomVideo.rating !== '無' ? selectedRandomVideo.rating : '' }}</p>
+          
+          <div class="flex gap-3 w-full mt-2">
+            <a v-if="selectedRandomVideo.videoUrl" :href="selectedRandomVideo.videoUrl" target="_blank" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded text-center flex-1 transition">
+              🚀 馬上去看
+            </a>
+            <button @click="pickRandomVideo" class="bg-amber-600 hover:bg-amber-500 text-white font-bold py-2 px-4 rounded transition">
+              🔄 換一部
+            </button>
+            <button @click="randomModalVisible = false" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded transition">
+              關閉
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const db = new Dexie("AVManagerDB");
+    db.version(1).stores({
+      videos: '++id, code, actress, status, rating'
+    });
+
+    const { createApp, ref, computed, onMounted } = Vue;
+
+    createApp({
+      setup() {
+        const videos = ref([]);
+        const searchQuery = ref('');
+        const statusFilter = ref('全部'); 
+        const sortBy = ref('latest');
+        const viewMode = ref('card');
+        const editingId = ref(null);
+        const fileInput = ref(null);
+        const isNsfwHidden = ref(false);
+
+        const randomModalVisible = ref(false);
+        const selectedRandomVideo = ref(null);
+
+        const toggleNsfw = () => {
+          isNsfwHidden.value = !isNsfwHidden.value;
+        };
+        
+        const form = ref({
+          code: '', actress: '', status: '待看', rating: '無', coverUrl: '', videoUrl: ''
+        });
+
+        const loadVideos = async () => {
+          videos.value = await db.videos.toArray();
+        };
+
+        const searchByActress = (actressName) => {
+          if (!actressName) return;
+          searchQuery.value = actressName;
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        const pickRandomVideo = () => {
+          let pool = videos.value.filter(v => v.status === '待看');
+          if (pool.length === 0) {
+            pool = videos.value;
+          }
+          if (pool.length === 0) {
+            alert('目前庫裡面沒有任何影片可以抽喔！');
+            return;
+          }
+          const randomIndex = Math.floor(Math.random() * pool.length);
+          selectedRandomVideo.value = pool[randomIndex];
+          randomModalVisible.value = true;
+        };
+
+        const filteredVideos = computed(() => {
+          let result = [...videos.value];
+          
+          if (statusFilter.value !== '全部') {
+            result = result.filter(v => v.status === statusFilter.value);
+          }
+          
+          if (searchQuery.value) {
+            const q = searchQuery.value.toLowerCase();
+            result = result.filter(video => 
+              (video.code && video.code.toLowerCase().includes(q)) ||
+              (video.actress && video.actress.toLowerCase().includes(q))
+            );
+          }
+
+          result.sort((a, b) => {
+            if (sortBy.value === 'latest') {
+              return b.id - a.id;
+            } else if (sortBy.value === 'rating') {
+              const weight = { '⭐⭐⭐⭐⭐': 5, '⭐⭐⭐⭐': 4, '⭐⭐⭐': 3, '⭐⭐': 2, '⭐': 1, '無': 0 };
+              return (weight[b.rating] || 0) - (weight[a.rating] || 0);
+            } else if (sortBy.value === 'code') {
+              return (a.code || '').localeCompare(b.code || '');
+            }
+            return 0;
+          });
+          
+          return result;
+        });
+
+        const resetForm = () => {
+          form.value = { code: '', actress: '', status: '待看', rating: '無', coverUrl: '', videoUrl: '' };
+          editingId.value = null;
+        };
+
+        const addVideo = async () => {
+          if (!form.value.code) {
+            alert('請輸入番號或標題！');
+            return;
+          }
+          await db.videos.add({ ...form.value });
+          resetForm();
+          await loadVideos();
+        };
+
+        const editVideo = (video) => {
+          editingId.value = video.id;
+          form.value = { ...video };
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        const saveEdit = async () => {
+          if (!form.value.code) {
+            alert('番號/標題不能為空！');
+            return;
+          }
+          await db.videos.update(editingId.value, { ...form.value });
+          resetForm();
+          await loadVideos();
+        };
+
+        const cancelEdit = () => {
+          resetForm();
+        };
+
+        const deleteVideo = async (id) => {
+          if(confirm('確定要刪除這筆紀錄嗎？')) {
+            await db.videos.delete(id);
+            if (editingId.value === id) resetForm();
+            await loadVideos();
+          }
+        };
+
+        const exportData = async () => {
+          const allData = await db.videos.toArray();
+          if (allData.length === 0) {
+            alert('目前沒有任何資料可以匯出喔！');
+            return;
+          }
+          const jsonString = JSON.stringify(allData, null, 2);
+          const blob = new Blob([jsonString], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const date = new Date().toISOString().split('T')[0];
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `AVManager_Backup_${date}.json`;
+          a.click();
+          URL.revokeObjectURL(url);
+        };
+
+        const triggerImport = () => {
+          fileInput.value.click();
+        };
+
+        const importData = (event) => {
+          const file = event.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            try {
+              const importedData = JSON.parse(e.target.result);
+              if (!Array.isArray(importedData)) throw new Error("資料格式不正確");
+              if (confirm(`準備匯入 ${importedData.length} 筆資料。\n這將會與您目前的資料合併。確認要繼續嗎？`)) {
+                await db.videos.bulkPut(importedData);
+                await loadVideos();
+                alert('匯入成功！');
+              }
+            } catch (err) {
+              alert('讀取失敗！請確保上傳的是系統匯出的 JSON 備份檔。');
+            }
+            event.target.value = '';
+          };
+          reader.readAsText(file);
+        };
+
+        onMounted(() => {
+          loadVideos();
+          
+          const urlParams = new URLSearchParams(window.location.search);
+          if (urlParams.has('code')) {
+            form.value.code = urlParams.get('code') || '';
+            form.value.coverUrl = urlParams.get('cover') || '';
+            form.value.actress = urlParams.get('actress') || '';
+            form.value.videoUrl = urlParams.get('url') || '';
+            
+            window.history.replaceState(null, '', window.location.pathname);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+        });
+
+        return { 
+          videos, form, editingId, searchQuery, statusFilter, sortBy, viewMode, 
+          filteredVideos, fileInput, isNsfwHidden, randomModalVisible, selectedRandomVideo,
+          addVideo, editVideo, saveEdit, cancelEdit, deleteVideo, toggleNsfw, searchByActress, pickRandomVideo,
+          exportData, triggerImport, importData
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>
