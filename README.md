@@ -40,7 +40,7 @@
 在瀏覽器建立書籤，並將下列對應的網址貼入（請記得將程式碼中的 `myUrl` 替換為你的實際網址，例如 GitHub Pages 網址或本機網址）：
 
 ### 1. ⚡ 抓取 Jable
-```javascript
+
 javascript:(function(){
   let t = document.title;
   let img = document.querySelector('meta[property="og:image"]');
@@ -52,7 +52,9 @@ javascript:(function(){
   let a = document.createElement('a'); a.href = finalUrl; a.target = '_blank';
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
 })();
+
 ### 2. ⚡ 抓取 MissAV
+
 javascript:(function(){
   try {
     let t = document.title || '';
@@ -67,7 +69,9 @@ javascript:(function(){
     setTimeout(function() { if (!document.hidden) { window.location.href = finalUrl; } }, 800);
   } catch(e) {}
 })();
-### 2. ⚡ 抓取 123AV
+
+### 3. ⚡ 抓取 123AV
+
 javascript:(function(){
   try {
     let t = document.title || '';
