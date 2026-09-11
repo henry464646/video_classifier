@@ -27,6 +27,7 @@
         <!-- 排序選單 -->
         <select v-model="sortBy" class="bg-gray-800 text-white p-2 rounded border border-gray-700 outline-none cursor-pointer">
           <option value="latest">⏱️ 最新加入</option>
+          <option value="releaseDate">📅 發行日期</option>
           <option value="rating">⭐ 評價高低</option>
           <option value="code">🔤 番號字母</option>
         </select>
@@ -34,6 +35,11 @@
         <!-- 檢視模式切換 (卡片 / 表格) -->
         <button @click="viewMode = (viewMode === 'card' ? 'table' : 'card')" class="bg-gray-800 hover:bg-gray-700 text-gray-200 px-3 py-2 rounded border border-gray-700 transition">
           {{ viewMode === 'card' ? '📋 切換表格' : '🖼️ 切換卡片' }}
+        </button>
+
+        <!-- 📊 統計儀表板按鈕 -->
+        <button @click="showDashboard = !showDashboard" :class="showDashboard ? 'bg-pink-600' : 'bg-gray-800 hover:bg-gray-700 text-gray-200'" class="px-3 py-2 rounded border border-gray-700 transition">
+          📊 統計面板
         </button>
 
         <!-- 🎲 隨機選片機 -->
@@ -55,6 +61,46 @@
             📥 還原
           </button>
           <input type="file" ref="fileInput" @change="importData" accept=".json" class="hidden">
+        </div>
+      </div>
+    </div>
+
+    <!-- 📊 統計儀表板區塊 -->
+    <div v-if="showDashboard" class="bg-gray-800 p-6 rounded-lg shadow-xl mb-6 border border-pink-500/40 animate-fade">
+      <h2 class="text-xl font-bold text-pink-400 mb-4 flex items-center gap-2">
+        <span>📈</span> 收藏數據儀表板
+      </h2>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+        <div class="bg-gray-750 p-4 rounded-lg border border-gray-700 text-center">
+          <div class="text-gray-400 text-sm mb-1">總收藏數</div>
+          <div class="text-2xl font-bold text-white">{{ stats.total }} 部</div>
+        </div>
+        <div class="bg-gray-750 p-4 rounded-lg border border-gray-700 text-center">
+          <div class="text-gray-400 text-sm mb-1">已看 / 待看</div>
+          <div class="text-2xl font-bold text-pink-400">{{ stats.watched }} / {{ stats.pending }}</div>
+        </div>
+        <div class="bg-gray-750 p-4 rounded-lg border border-gray-700 text-center">
+          <div class="text-gray-400 text-sm mb-1">喜愛收藏</div>
+          <div class="text-2xl font-bold text-red-400">{{ stats.favorite }} 部</div>
+        </div>
+        <div class="bg-gray-750 p-4 rounded-lg border border-gray-700 text-center">
+          <div class="text-gray-400 text-sm mb-1">5星神作比例</div>
+          <div class="text-2xl font-bold text-amber-400">{{ stats.masterpieceRate }}%</div>
+        </div>
+      </div>
+
+      <!-- 熱門演員排行榜 -->
+      <div class="bg-gray-750 p-4 rounded-lg border border-gray-700">
+        <h3 class="text-sm font-bold text-gray-300 mb-3">🔥 收藏最多的前 5 名演員</h3>
+        <div v-if="stats.topActresses.length === 0" class="text-sm text-gray-500">尚無演員資料</div>
+        <div v-else class="flex flex-wrap gap-2">
+          <span v-for="(item, index) in stats.topActresses" :key="index" 
+                @click="searchByActress(item.name)"
+                class="bg-gray-700 hover:bg-gray-600 text-pink-300 px-3 py-1 rounded-full text-sm cursor-pointer transition border border-gray-600 flex items-center gap-1.5">
+            <span class="text-xs text-gray-400">#{{ index + 1 }}</span>
+            <span class="font-bold">{{ item.name }}</span>
+            <span class="bg-pink-900/60 text-pink-200 text-xs px-1.5 py-0.5 rounded-full">{{ item.count }}</span>
+          </span>
         </div>
       </div>
     </div>
@@ -100,7 +146,8 @@
       </div>
       
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <input v-model="form.coverUrl" type="text" placeholder="封面圖網址 (選填)" class="bg-gray-700 text-white p-2 rounded md:col-span-2 outline-none">
+        <input v-model="form.releaseDate" type="date" placeholder="發行日期" class="bg-gray-700 text-white p-2 rounded outline-none" title="發行日期">
+        <input v-model="form.coverUrl" type="text" placeholder="封面圖網址 (選填)" class="bg-gray-700 text-white p-2 rounded outline-none">
         <input v-model="form.videoUrl" type="text" placeholder="觀看/下載網址 (選填)" class="bg-gray-700 text-white p-2 rounded outline-none">
         
         <div class="flex gap-2">
@@ -141,7 +188,13 @@
         </div>
         
         <div class="p-4 flex-1 flex flex-col">
-          <h2 class="text-xl font-bold text-white tracking-wide mb-1 truncate" :title="video.code">{{ video.code }}</h2>
+          <div class="flex justify-between items-start mb-1">
+            <h2 class="text-xl font-bold text-white tracking-wide truncate mr-2" :title="video.code">{{ video.code }}</h2>
+            <div class="text-xs text-gray-400 shrink-0 text-right mt-1">
+              <div>發行: {{ video.releaseDate || '未填' }}</div>
+              <div>加入: {{ video.createdAt || '未知' }}</div>
+            </div>
+          </div>
           <p @click="searchByActress(video.actress)" 
              class="text-pink-400 font-semibold mb-2 cursor-pointer hover:text-pink-300 hover:underline inline-block w-fit" 
              title="點擊以搜尋此演員">
@@ -174,6 +227,8 @@
             <th class="p-3">演員</th>
             <th class="p-3">狀態</th>
             <th class="p-3">評價</th>
+            <th class="p-3">發行日期</th>
+            <th class="p-3">加入日期</th>
             <th class="p-3 text-center">操作</th>
           </tr>
         </thead>
@@ -197,6 +252,8 @@
               <span class="px-2 py-1 bg-gray-700 rounded-full text-xs border border-gray-600">{{ video.status }}</span>
             </td>
             <td class="p-3 text-sm whitespace-nowrap">{{ video.rating !== '無' ? video.rating : '-' }}</td>
+            <td class="p-3 text-sm text-gray-400 whitespace-nowrap">{{ video.releaseDate || '-' }}</td>
+            <td class="p-3 text-sm text-gray-400 whitespace-nowrap">{{ video.createdAt || '-' }}</td>
             <td class="p-3 text-center whitespace-nowrap">
               <div class="flex items-center justify-center gap-3">
                 <a v-if="video.videoUrl" :href="video.videoUrl" target="_blank" class="text-blue-400 hover:text-blue-300 text-sm font-bold">觀看</a>
@@ -220,7 +277,9 @@
           </div>
           <h4 class="text-lg font-bold text-white text-center mb-1">{{ selectedRandomVideo.code }}</h4>
           <p class="text-pink-400 font-semibold mb-2">{{ selectedRandomVideo.actress || '未知演員' }}</p>
-          <p class="text-sm mb-4 text-gray-300">{{ selectedRandomVideo.rating !== '無' ? selectedRandomVideo.rating : '' }}</p>
+          <p class="text-sm mb-1 text-gray-300">{{ selectedRandomVideo.rating !== '無' ? selectedRandomVideo.rating : '' }}</p>
+          <p class="text-xs text-gray-400">發行日期：{{ selectedRandomVideo.releaseDate || '未填' }}</p>
+          <p class="text-xs text-gray-400 mb-4">加入日期：{{ selectedRandomVideo.createdAt || '未知' }}</p>
           
           <div class="flex gap-3 w-full mt-2">
             <a v-if="selectedRandomVideo.videoUrl" :href="selectedRandomVideo.videoUrl" target="_blank" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded text-center flex-1 transition">
@@ -242,7 +301,7 @@
   <script>
     const db = new Dexie("AVManagerDB");
     db.version(1).stores({
-      videos: '++id, code, actress, status, rating'
+      videos: '++id, code, actress, status, rating, createdAt, releaseDate'
     });
 
     const { createApp, ref, computed, onMounted } = Vue;
@@ -254,6 +313,7 @@
         const statusFilter = ref('全部'); 
         const sortBy = ref('latest');
         const viewMode = ref('card');
+        const showDashboard = ref(false);
         const editingId = ref(null);
         const fileInput = ref(null);
         const isNsfwHidden = ref(false);
@@ -266,7 +326,7 @@
         };
         
         const form = ref({
-          code: '', actress: '', status: '待看', rating: '無', coverUrl: '', videoUrl: ''
+          code: '', actress: '', status: '待看', rating: '無', releaseDate: '', coverUrl: '', videoUrl: ''
         });
 
         const loadVideos = async () => {
@@ -276,8 +336,34 @@
         const searchByActress = (actressName) => {
           if (!actressName) return;
           searchQuery.value = actressName;
-          window.scrollTo({ top: 0, behavior: 'smooth' });
+          showDashboard.value = false;
+          window.scrollTo({ top: 'smooth', top: 0 });
         };
+
+        // 統計計算
+        const stats = computed(() => {
+          const total = videos.value.length;
+          const watched = videos.value.filter(v => v.status === '已看').length;
+          const pending = videos.value.filter(v => v.status === '待看').length;
+          const favorite = videos.value.filter(v => v.status === '喜愛').length;
+          const masterpieceCount = videos.value.filter(v => v.rating === '⭐⭐⭐⭐⭐').length;
+          const masterpieceRate = total > 0 ? Math.round((masterpieceCount / total) * 100) : 0;
+
+          const actressMap = {};
+          videos.value.forEach(v => {
+            if (v.actress && v.actress.trim() !== '') {
+              const name = v.actress.trim();
+              actressMap[name] = (actressMap[name] || 0) + 1;
+            }
+          });
+
+          const topActresses = Object.entries(actressMap)
+            .map(([name, count]) => ({ name, count }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 5);
+
+          return { total, watched, pending, favorite, masterpieceRate, topActresses };
+        });
 
         const pickRandomVideo = () => {
           let pool = videos.value.filter(v => v.status === '待看');
@@ -311,6 +397,11 @@
           result.sort((a, b) => {
             if (sortBy.value === 'latest') {
               return b.id - a.id;
+            } else if (sortBy.value === 'releaseDate') {
+              // 比較發行日期，沒有日期的排在後面
+              if (!a.releaseDate) return 1;
+              if (!b.releaseDate) return -1;
+              return b.releaseDate.localeCompare(a.releaseDate);
             } else if (sortBy.value === 'rating') {
               const weight = { '⭐⭐⭐⭐⭐': 5, '⭐⭐⭐⭐': 4, '⭐⭐⭐': 3, '⭐⭐': 2, '⭐': 1, '無': 0 };
               return (weight[b.rating] || 0) - (weight[a.rating] || 0);
@@ -324,8 +415,16 @@
         });
 
         const resetForm = () => {
-          form.value = { code: '', actress: '', status: '待看', rating: '無', coverUrl: '', videoUrl: '' };
+          form.value = { code: '', actress: '', status: '待看', rating: '無', releaseDate: '', coverUrl: '', videoUrl: '' };
           editingId.value = null;
+        };
+
+        const getTodayDate = () => {
+          const d = new Date();
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
         };
 
         const addVideo = async () => {
@@ -333,7 +432,11 @@
             alert('請輸入番號或標題！');
             return;
           }
-          await db.videos.add({ ...form.value });
+          const newVideo = {
+            ...form.value,
+            createdAt: getTodayDate()
+          };
+          await db.videos.add(newVideo);
           resetForm();
           await loadVideos();
         };
@@ -424,8 +527,8 @@
         });
 
         return { 
-          videos, form, editingId, searchQuery, statusFilter, sortBy, viewMode, 
-          filteredVideos, fileInput, isNsfwHidden, randomModalVisible, selectedRandomVideo,
+          videos, form, editingId, searchQuery, statusFilter, sortBy, viewMode, showDashboard,
+          filteredVideos, fileInput, isNsfwHidden, randomModalVisible, selectedRandomVideo, stats,
           addVideo, editVideo, saveEdit, cancelEdit, deleteVideo, toggleNsfw, searchByActress, pickRandomVideo,
           exportData, triggerImport, importData
         };
